@@ -90,7 +90,7 @@ class DQfD:
     def build_layers(self, state, c_names, units_1, units_2, w_i, b_i, reg=None):
         a_d = self.action_dim
         with tf.variable_scope('l1'):
-            w1 = tf.get_variable('w1', [a_d, units_1], initializer=w_i, collections=c_names, regularizer=reg)
+            w1 = tf.get_variable('w1', [self.state_dim, units_1], initializer=w_i, collections=c_names, regularizer=reg)
             b1 = tf.get_variable('b1', [1, units_1], initializer=b_i, collections=c_names, regularizer=reg)
             dense1 = tf.nn.relu(tf.matmul(state, w1) + b1)
         with tf.variable_scope('l2'):

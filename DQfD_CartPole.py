@@ -163,17 +163,17 @@ if __name__ == '__main__':
     env = gym.make(Config.ENV_NAME)
     # env = wrappers.Monitor(env, '/tmp/CartPole-v0', force=True)
     # ------------------------ get demo scores by DDQN -----------------------------
-    # get_demo_data(env)
+    get_demo_data(env)
     # --------------------------  get DDQN scores ----------------------------------
-    # ddqn_sum_scores = np.zeros(Config.episode)
-    # for i in range(Config.iteration):
-    #     scores = run_DDQN(i, env)
-    #     ddqn_sum_scores = np.array([a + b for a, b in zip(scores, ddqn_sum_scores)])
-    # ddqn_mean_scores = ddqn_sum_scores / Config.iteration
-    # with open('./ddqn_mean_scores.p', 'wb') as f:
-    #     pickle.dump(ddqn_mean_scores, f, protocol=2)
-    with open('./ddqn_mean_scores.p', 'rb') as f:
-        ddqn_mean_scores = pickle.load(f)
+    ddqn_sum_scores = np.zeros(Config.episode)
+    for i in range(Config.iteration):
+        scores = run_DDQN(i, env)
+        ddqn_sum_scores = np.array([a + b for a, b in zip(scores, ddqn_sum_scores)])
+    ddqn_mean_scores = ddqn_sum_scores / Config.iteration
+    with open('./ddqn_mean_scores.p', 'wb') as f:
+        pickle.dump(ddqn_mean_scores, f, protocol=2)
+    # with open('./ddqn_mean_scores.p', 'rb') as f:
+    #    ddqn_mean_scores = pickle.load(f)
     # ----------------------------- get DQfD scores --------------------------------
     dqfd_sum_scores = np.zeros(Config.episode)
     for i in range(Config.iteration):

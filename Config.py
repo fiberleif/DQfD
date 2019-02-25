@@ -18,9 +18,9 @@ class Config:
     MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'model/DQfD_model')
     DEMO_DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'demo.p')
 
-    demo_buffer_size = 500 * 50
-    replay_buffer_size = demo_buffer_size * 2
-    iteration = 5
+    demo_buffer_size = 500
+    replay_buffer_size = 500 * 50 * 2
+    iteration = 1
     episode = 300  # 300 games per iteration
     trajectory_n = 10  # for n-step TD-loss (both demo data and generated data)
 
