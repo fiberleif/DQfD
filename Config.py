@@ -3,7 +3,7 @@ import os
 
 
 class Config:
-    ENV_NAME = "CartPole-v1"
+    ENV_NAME = "CartPole-v0"
     GAMMA = 0.99  # discount factor for target Q
     INITIAL_EPSILON = 1.0  # starting value of epsilon
     FINAL_EPSILON = 0.01  # final value of epsilon
@@ -18,8 +18,8 @@ class Config:
     MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'model/DQfD_model')
     DEMO_DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'demo.p')
 
-    demo_buffer_size = 500
-    replay_buffer_size = 500 * 50 * 2
+    demo_buffer_size = 200
+    replay_buffer_size = 200 * 50 * 2
     iteration = 1
     episode = 300  # 300 games per iteration
     trajectory_n = 10  # for n-step TD-loss (both demo data and generated data)

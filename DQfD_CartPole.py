@@ -138,13 +138,13 @@ def get_demo_data(env):
             action = agent.egreedy_action(state)  # e-greedy action for train
             next_state, reward, done, _ = env.step(action)
             score += reward
-            reward = reward if not done or score == 499 else -100
+            reward = reward if not done or score == 199 else -100
             agent.perceive([state, action, reward, next_state, done, 0.0])  # 0. means it is not a demo data
             demo.append([state, action, reward, next_state, done, 1.0])  # record the data that could be expert-data
             agent.train_Q_network(update=False)
             state = next_state
         if done:
-            if score == 500:  # expert demo data
+            if score == 200:  # expert demo data
                 demo = set_n_step(demo, Config.trajectory_n)
                 agent.demo_buffer.extend(demo)
             agent.sess.run(agent.update_target_net)
