@@ -63,7 +63,7 @@ def run_DDQN(index, env):
                     avg_length = np.mean(lengths)
                     iteration_avg_scores.append(avg_score)
                     iteration_avg_lengths.append(avg_length)
-                    print("iteration:", iter, "  avg_ret:", avg_score, " avg_length:", avg_length)
+                    print("iteration:", iter, "  avg_ret:", avg_score, " avg_length:", avg_length, "num_trajs:", len(returns))
                     break
     return iteration_avg_scores, iteration_avg_lengths
 
@@ -134,7 +134,7 @@ def run_DQfD(index, env):
                     avg_length = np.mean(lengths)
                     iteration_avg_scores.append(avg_score)
                     iteration_avg_lengths.append(avg_length)
-                    print("iteration:", iter, "  avg_ret:", avg_score, " avg_length:", avg_length)
+                    print("iteration:", iter, "  avg_ret:", avg_score, " avg_length:", avg_length, "num_trajs:", len(returns))
                     break
     return iteration_avg_scores, iteration_avg_lengths
 
