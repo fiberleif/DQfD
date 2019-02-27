@@ -29,27 +29,43 @@ def map_scores(dqfd_scores=None, ddqn_scores=None, xlabel=None, ylabel=None):
 def run_DDQN(index, env):
     with tf.variable_scope('DDQN_' + str(index)):
         agent = DQfDDDQN(env, DDQNConfig())
-    scores = []
-    for e in range(Config.episode):
-        done = False
-        score = 0  # sum of reward in one episode
-        state = env.reset()
-        while done is False:
-            action = agent.egreedy_action(state)  # e-greedy action for train
-            next_state, reward, done, _ = env.step(action)
-            score += reward
-            reward = reward if not done or score == 499 else -100
-            agent.perceive([state, action, reward, next_state, done, 0.0])  # 0. means it is not a demo data
-            agent.train_Q_network(update=False)
-            state = next_state
-        if done:
-            scores.append(score)
-            agent.sess.run(agent.update_target_net)
-            print("episode:", e, "  score:", score, "  demo_buffer:", len(agent.demo_buffer),
-                  "  memory length:", len(agent.replay_buffer), "  epsilon:", agent.epsilon)
-            # if np.mean(scores[-min(10, len(scores)):]) > 490:
-            #     break
-    return scores
+    iteration_avg_scores = []
+    iteration_avg_lengths = []
+    for iter in range(Config.iteration):
+        num_sa = 0
+        returns = []
+        lengths = []
+        while True:
+            done = False
+            traj_return = 0  # sum of reward in one episode
+            traj_length = 0
+            state = env.reset()
+            while done is False:
+                action = agent.egreedy_action(state)  # e-greedy action for train
+                next_state, reward, done, _ = env.step(action)
+                traj_length += 1
+                traj_return += reward
+                reward = reward if not done or traj_return == 499 else -100
+                agent.perceive([state, action, reward, next_state, done, 0.0])  # 0. means it is not a demo data
+                agent.train_Q_network(update=False)
+                state = next_state
+            if done:
+                returns.append(traj_return)
+                lengths.append(traj_length)
+                num_sa += traj_length
+                agent.sess.run(agent.update_target_net)
+                # print("episode:", e, "  score:", score, "  demo_buffer:", len(agent.demo_buffer),
+                #       "  memory length:", len(agent.replay_buffer), "  epsilon:", agent.epsilon)
+                # if np.mean(scores[-min(10, len(scores)):]) > 490:
+                #     break
+                if num_sa >= Config.min_total_sa:
+                    avg_score = np.mean(returns)
+                    avg_length = np.mean(lengths)
+                    iteration_avg_scores.append(avg_score)
+                    iteration_avg_lengths.append(avg_length)
+                    print("iteration:", iter, "  avg_ret:", avg_score, " avg_length:", avg_length)
+                    break
+    return iteration_avg_scores, iteration_avg_lengths
 
 
 def run_DQfD(index, env):
@@ -61,51 +77,66 @@ def run_DQfD(index, env):
         agent = DQfD(env, DQfDConfig(), demo_transitions=demo_transitions)
 
     agent.pre_train()  # use the demo data to pre-train network
-    scores, e, replay_full_episode = [], 0, None
-    while True:
-        done, score, n_step_reward, state = False, 0, None, env.reset()
-        t_q = deque(maxlen=Config.trajectory_n)
-        while done is False:
-            action = agent.egreedy_action(state)  # e-greedy action for train
-            next_state, reward, done, _ = env.step(action)
-            score += reward
-            reward = reward if not done or score == 499 else -100
-            reward_to_sub = 0. if len(t_q) < t_q.maxlen else t_q[0][2]  # record the earliest reward for the sub
-            t_q.append([state, action, reward, next_state, done, 0.0])
-            if len(t_q) == t_q.maxlen:
-                if n_step_reward is None:  # only compute once when t_q first filled
-                    n_step_reward = sum([t[2]*Config.GAMMA**i for i, t in enumerate(t_q)])
-                else:
-                    n_step_reward = (n_step_reward - reward_to_sub) / Config.GAMMA
-                    n_step_reward += reward*Config.GAMMA**(Config.trajectory_n-1)
-                t_q[0].extend([n_step_reward, next_state, done, t_q.maxlen])  # actual_n is max_len here
-                agent.perceive(t_q[0])  # perceive when a transition is completed
+
+    episodes = 0
+    replay_full_episode = None
+    iteration_avg_scores = []
+    iteration_avg_lengths = []
+    for iter in range(Config.iteration):
+        num_sa = 0
+        returns = []
+        lengths = []
+        while True:
+            done, n_step_reward, state = False, None, env.reset()
+            traj_return = 0  # sum of reward in one episode
+            traj_length = 0
+            t_q = deque(maxlen=Config.trajectory_n)
+            while done is False:
+                action = agent.egreedy_action(state)  # e-greedy action for train
+                next_state, reward, done, _ = env.step(action)
+                traj_length += 1
+                traj_return += reward
+                reward = reward if not done or traj_return == 499 else -100
+                reward_to_sub = 0. if len(t_q) < t_q.maxlen else t_q[0][2]  # record the earliest reward for the sub
+                t_q.append([state, action, reward, next_state, done, 0.0])
+                if len(t_q) == t_q.maxlen:
+                    if n_step_reward is None:  # only compute once when t_q first filled
+                        n_step_reward = sum([t[2]*Config.GAMMA**i for i, t in enumerate(t_q)])
+                    else:
+                        n_step_reward = (n_step_reward - reward_to_sub) / Config.GAMMA
+                        n_step_reward += reward*Config.GAMMA**(Config.trajectory_n-1)
+                    t_q[0].extend([n_step_reward, next_state, done, t_q.maxlen])  # actual_n is max_len here
+                    agent.perceive(t_q[0])  # perceive when a transition is completed
+                    if agent.replay_memory.full():
+                        agent.train_Q_network(update=False)  # train along with generation
+                        replay_full_episode = replay_full_episode or episodes
+                state = next_state
+            if done:
+                episodes += 1
+                returns.append(traj_return)
+                lengths.append(traj_length)
+                num_sa += traj_length
+                # handle transitions left in t_q
+                t_q.popleft()  # first transition's n-step is already set
+                transitions = set_n_step(t_q, Config.trajectory_n)
+                for t in transitions:
+                    agent.perceive(t)
+                    if agent.replay_memory.full():
+                        agent.train_Q_network(update=False)
+                        replay_full_episode = replay_full_episode or episodes
                 if agent.replay_memory.full():
-                    agent.train_Q_network(update=False)  # train along with generation
-                    replay_full_episode = replay_full_episode or e
-            state = next_state
-        if done:
-            # handle transitions left in t_q
-            t_q.popleft()  # first transition's n-step is already set
-            transitions = set_n_step(t_q, Config.trajectory_n)
-            for t in transitions:
-                agent.perceive(t)
-                if agent.replay_memory.full():
-                    agent.train_Q_network(update=False)
-                    replay_full_episode = replay_full_episode or e
-            if agent.replay_memory.full():
-                scores.append(score)
-                agent.sess.run(agent.update_target_net)
-            if replay_full_episode is not None:
-                print("episode: {}  trained-episode: {}  score: {}  memory length: {}  epsilon: {}"
-                      .format(e, e-replay_full_episode, score, len(agent.replay_memory), agent.epsilon))
-            # if np.mean(scores[-min(10, len(scores)):]) > 495:
-            #     break
-            # agent.save_model()
-        if len(scores) >= Config.episode:
-            break
-        e += 1
-    return scores
+                    agent.sess.run(agent.update_target_net)
+                # if np.mean(scores[-min(10, len(scores)):]) > 495:
+                #     break
+                # agent.save_model()
+                if num_sa >= Config.min_total_sa:
+                    avg_score = np.mean(returns)
+                    avg_length = np.mean(lengths)
+                    iteration_avg_scores.append(avg_score)
+                    iteration_avg_lengths.append(avg_length)
+                    print("iteration:", iter, "  avg_ret:", avg_score, " avg_length:", avg_length)
+                    break
+    return iteration_avg_scores, iteration_avg_lengths
 
 
 # extend [n_step_reward, n_step_away_state] for transitions in demo
@@ -165,21 +196,21 @@ if __name__ == '__main__':
     # ------------------------ get demo scores by DDQN -----------------------------
     get_demo_data(env)
     # --------------------------  get DDQN scores ----------------------------------
-    ddqn_sum_scores = np.zeros(Config.episode)
-    for i in range(Config.iteration):
-        scores = run_DDQN(i, env)
+    ddqn_sum_scores = np.zeros(Config.iteration)
+    for i in range(Config.runs):
+        scores, _ = run_DDQN(i, env)
         ddqn_sum_scores = np.array([a + b for a, b in zip(scores, ddqn_sum_scores)])
-    ddqn_mean_scores = ddqn_sum_scores / Config.iteration
+    ddqn_mean_scores = ddqn_sum_scores / Config.runs
     with open('./ddqn_mean_scores.p', 'wb') as f:
         pickle.dump(ddqn_mean_scores, f, protocol=2)
     # with open('./ddqn_mean_scores.p', 'rb') as f:
     #    ddqn_mean_scores = pickle.load(f)
     # ----------------------------- get DQfD scores --------------------------------
-    dqfd_sum_scores = np.zeros(Config.episode)
-    for i in range(Config.iteration):
-        scores = run_DQfD(i, env)
+    dqfd_sum_scores = np.zeros(Config.iteration)
+    for i in range(Config.runs):
+        scores, _ = run_DQfD(i, env)
         dqfd_sum_scores = np.array([a + b for a, b in zip(scores, dqfd_sum_scores)])
-    dqfd_mean_scores = dqfd_sum_scores / Config.iteration
+    dqfd_mean_scores = dqfd_sum_scores / Config.runs
     with open('./dqfd_mean_scores.p', 'wb') as f:
         pickle.dump(dqfd_mean_scores, f, protocol=2)
 
